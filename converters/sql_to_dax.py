@@ -144,7 +144,9 @@ class SQLToDaxConverter(BaseConverter):
                 table_name = from_tables[0] if from_tables else 'Table'
                 
                 # Build measure
-                measure_name = column.get('alias', f"SUM_{column_name}" if function == "SUM" else f"{function}_{column_name}")
+                measure_name = column.get('alias')
+                if not measure_name:
+                    measure_name = f"SUM_{column_name}" if function == "SUM" else f"{function}_{column_name}"
                 
                 if where_clause:
                     # Convert WHERE clause to FILTER
@@ -182,8 +184,11 @@ class SQLToDaxConverter(BaseConverter):
                 # Clean column name if it has table prefix
                 if '.' in column_name:
                     column_name = column_name.split('.')[-1]
-                alias_name = column.get('alias', column_name)
-                calculations.append(f"{alias_name} = {table_name}[{column_name}]")
+                alias_name = column.get('alias')
+                if alias_name:
+                    calculations.append(f"{alias_name} = {table_name}[{column_name}]")
+                else:
+                    calculations.append(f"{column_name} = {table_name}[{column_name}]")
         
         return '\n'.join(calculations)
     
