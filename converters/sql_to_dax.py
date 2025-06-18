@@ -174,9 +174,9 @@ class SQLToDaxConverter(BaseConverter):
                 column_name = column.get('alias', 'CalculatedColumn')
                 calculations.append(f"{column_name} = {expression}")
             else:
-                # Simple column reference
+                # Simple column reference - convert to proper DAX reference
                 column_name = column['column']
-                calculations.append(f"-- Reference to {table_name}[{column_name}]")
+                calculations.append(f"{column_name} = {table_name}[{column_name}]")
         
         return '\n'.join(calculations)
     
@@ -208,12 +208,36 @@ class SQLToDaxConverter(BaseConverter):
             dax_expr = re.sub(pattern, replacement, dax_expr, flags=re.IGNORECASE)
         
         # Convert column references to table[column] format
+        # Handle table.column references first
+        table_column_pattern = r'\b([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
+        def replace_table_column(match):
+            full_ref = match.group(1)
+            parts = full_ref.split('.')
+            if len(parts) == 2:
+                table_ref, column_ref = parts
+                return f'{table_ref}[{column_ref}]'
+            return full_ref
+        
+        dax_expr = re.sub(table_column_pattern, replace_table_column, dax_expr)
+        
+        # Then handle simple column references
         column_pattern = r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b'
         def replace_column(match):
             column = match.group(1)
-            # Don't convert function names or keywords
-            if column.upper() in ['AND', 'OR', 'NOT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END']:
+            # Don't convert function names, keywords, or literals
+            if column.upper() in ['AND', 'OR', 'NOT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 
+                                  'TRUE', 'FALSE', 'NULL', 'SUM', 'COUNT', 'AVG', 'MIN', 'MAX',
+                                  'DATE', 'TIME', 'YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND',
+                                  'IS', 'AS', 'IN', 'EXISTS', 'BETWEEN', 'LIKE', 'DISTINCT']:
                 return column
+            # Don't convert numeric literals
+            if column.isdigit():
+                return column
+            # Don't convert if already in table[column] format
+            if '[' in dax_expr and ']' in dax_expr:
+                # Check if this column is already converted
+                if f'[{column}]' in dax_expr:
+                    return column
             return f'{table_name}[{column}]'
         
         dax_expr = re.sub(column_pattern, replace_column, dax_expr)

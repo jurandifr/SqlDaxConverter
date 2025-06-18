@@ -60,7 +60,12 @@ class SQLParser:
             statement_str = str(statement).strip()
             
             if not statement_str:
-                return None
+                return {
+                    'type': 'EMPTY',
+                    'original': '',
+                    'supported': False,
+                    'note': 'Empty statement'
+                }
             
             # Determine statement type
             stmt_type = self._get_statement_type(statement_str)
@@ -200,11 +205,18 @@ class SQLParser:
         }
         
         try:
-            # Check for alias
-            alias_match = re.search(r'\s+AS\s+([a-zA-Z_][a-zA-Z0-9_]*)', column_expr, re.IGNORECASE)
+            # Check for alias (both AS and implicit)
+            alias_match = re.search(r'\s+(?:AS\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*$', column_expr, re.IGNORECASE)
             if alias_match:
-                column_info['alias'] = alias_match.group(1)
-                column_expr = re.sub(r'\s+AS\s+[a-zA-Z_][a-zA-Z0-9_]*', '', column_expr, flags=re.IGNORECASE)
+                # Check if this might be an alias (not a table.column reference)
+                potential_alias = alias_match.group(1)
+                column_part = column_expr[:alias_match.start()].strip()
+                
+                # If there's a dot or function call before the potential alias, it's likely an alias
+                if ('.' in column_part or '(' in column_part or 
+                    re.search(r'\s+AS\s+', column_expr, re.IGNORECASE)):
+                    column_info['alias'] = potential_alias
+                    column_expr = column_part
             
             # Check for aggregation functions
             agg_match = re.search(r'(\w+)\s*\(\s*(.+?)\s*\)', column_expr)
@@ -215,8 +227,13 @@ class SQLParser:
                     column_info['function'] = function
                     column_info['column'] = agg_match.group(2).strip()
             else:
-                # Simple column reference
-                column_info['column'] = column_expr.strip()
+                # Simple column reference - handle table.column format
+                clean_column = column_expr.strip()
+                if '.' in clean_column:
+                    # Extract just the column name after the dot
+                    column_info['column'] = clean_column.split('.')[-1]
+                else:
+                    column_info['column'] = clean_column
             
             return column_info
             
@@ -229,18 +246,36 @@ class SQLParser:
         tables = []
         
         try:
-            from_match = re.search(r'FROM\s+([^WHERE^GROUP^ORDER^HAVING^;]+)', statement, re.IGNORECASE)
+            # Improved regex to better capture table names before WHERE, GROUP BY, etc.
+            from_match = re.search(r'FROM\s+(.+?)(?:\s+WHERE|\s+GROUP\s+BY|\s+ORDER\s+BY|\s+HAVING|;|$)', statement, re.IGNORECASE | re.DOTALL)
             if from_match:
                 from_clause = from_match.group(1).strip()
                 
-                # Simple table extraction (could be improved for complex joins)
-                table_parts = re.split(r'\s+(?:INNER\s+)?(?:LEFT\s+)?(?:RIGHT\s+)?(?:FULL\s+)?JOIN\s+', from_clause, flags=re.IGNORECASE)
+                # Remove comments and extra whitespace
+                from_clause = re.sub(r'--.*', '', from_clause)
+                from_clause = ' '.join(from_clause.split())
+                
+                # Handle JOINs - split by JOIN keywords but keep the joined tables
+                join_pattern = r'\s+(?:INNER\s+|LEFT\s+(?:OUTER\s+)?|RIGHT\s+(?:OUTER\s+)?|FULL\s+(?:OUTER\s+)?)?JOIN\s+'
+                table_parts = re.split(join_pattern, from_clause, flags=re.IGNORECASE)
                 
                 for part in table_parts:
-                    # Extract table name (before any alias)
-                    table_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)', part)
+                    part = part.strip()
+                    if not part:
+                        continue
+                    
+                    # Remove ON conditions for JOINs
+                    part = re.sub(r'\s+ON\s+.+', '', part, flags=re.IGNORECASE)
+                    
+                    # Extract table name (before any alias or additional keywords)
+                    # Handle: table_name, schema.table_name, table_name alias, table_name AS alias
+                    table_match = re.search(r'^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)', part)
                     if table_match:
-                        tables.append(table_match.group(1))
+                        table_name = table_match.group(1)
+                        # Remove schema prefix if present for DAX conversion
+                        if '.' in table_name:
+                            table_name = table_name.split('.')[-1]
+                        tables.append(table_name)
             
             return tables
             
