@@ -138,6 +138,9 @@ class SQLToDaxConverter(BaseConverter):
             if column.get('is_aggregation'):
                 function = self.convert_function(column['function'])
                 column_name = column['column']
+                # Clean column name if it has table prefix
+                if '.' in column_name:
+                    column_name = column_name.split('.')[-1]
                 table_name = from_tables[0] if from_tables else 'Table'
                 
                 # Build measure
@@ -176,6 +179,9 @@ class SQLToDaxConverter(BaseConverter):
             else:
                 # Simple column reference - convert to proper DAX reference
                 column_name = column['column']
+                # Clean column name if it has table prefix
+                if '.' in column_name:
+                    column_name = column_name.split('.')[-1]
                 alias_name = column.get('alias', column_name)
                 calculations.append(f"{alias_name} = {table_name}[{column_name}]")
         
@@ -209,14 +215,15 @@ class SQLToDaxConverter(BaseConverter):
             dax_expr = re.sub(pattern, replacement, dax_expr, flags=re.IGNORECASE)
         
         # Convert column references to table[column] format
-        # Handle table.column references first
+        # Handle table.column or alias.column references first
         table_column_pattern = r'\b([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)\b'
         def replace_table_column(match):
             full_ref = match.group(1)
             parts = full_ref.split('.')
             if len(parts) == 2:
                 table_ref, column_ref = parts
-                return f'{table_ref}[{column_ref}]'
+                # Use the actual table name instead of alias
+                return f'{table_name}[{column_ref}]'
             return full_ref
         
         dax_expr = re.sub(table_column_pattern, replace_table_column, dax_expr)

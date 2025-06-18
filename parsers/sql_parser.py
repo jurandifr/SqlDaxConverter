@@ -392,12 +392,26 @@ class SQLParser:
                 column_parts = re.split(r',(?![^()]*\))', select_clause)
                 for part in column_parts:
                     part = part.strip()
-                    # Remove alias
-                    column_match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', part)
-                    if column_match and not re.match(r'^\d+$', column_match.group(1)):
-                        column_name = column_match.group(1)
-                        if column_name.upper() not in ['SELECT', 'FROM', 'WHERE', 'GROUP', 'ORDER', 'HAVING']:
-                            objects['columns'].append(column_name)
+                    # Skip aggregation functions
+                    if re.search(r'\b(SUM|COUNT|AVG|MIN|MAX|STDEV|VAR)\s*\(', part, re.IGNORECASE):
+                        continue
+                    
+                    # Remove AS alias
+                    part = re.sub(r'\s+AS\s+[a-zA-Z_][a-zA-Z0-9_]*', '', part, flags=re.IGNORECASE)
+                    
+                    # Extract column name (handle table.column format)
+                    if '.' in part:
+                        column_name = part.split('.')[-1].strip()
+                    else:
+                        column_match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', part)
+                        if column_match:
+                            column_name = column_match.group(1)
+                        else:
+                            continue
+                    
+                    if (column_name and not re.match(r'^\d+$', column_name) and
+                        column_name.upper() not in ['SELECT', 'FROM', 'WHERE', 'GROUP', 'ORDER', 'HAVING']):
+                        objects['columns'].append(column_name)
             
             # Find functions
             function_pattern = r'\b([A-Z_][A-Z0-9_]*)\s*\('
