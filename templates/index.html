@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL/Spotfire to DAX Converter</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    
+    <!-- Prism.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css" rel="stylesheet">
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i data-feather="database" class="me-2"></i>
+                SQL/Spotfire to DAX Converter
+            </a>
+        </div>
+    </nav>
+
+    <div class="container my-4">
+        <!-- Header Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="display-6 mb-3">Intelligent Code Converter</h1>
+                <p class="lead">Convert SQL queries and Spotfire expressions to DAX with intelligent object identification and error guidance.</p>
+            </div>
+        </div>
+
+        <!-- Main Converter Interface -->
+        <div class="row">
+            <!-- Input Section -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i data-feather="edit-3" class="me-2"></i>
+                            Source Code
+                        </h5>
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="conversionType" id="sqlToDax" value="sql_to_dax" checked>
+                            <label class="btn btn-outline-primary btn-sm" for="sqlToDax">SQL to DAX</label>
+                            
+                            <input type="radio" class="btn-check" name="conversionType" id="spotfireToDax" value="spotfire_to_dax">
+                            <label class="btn btn-outline-primary btn-sm" for="spotfireToDax">Spotfire to DAX</label>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <textarea id="sourceCode" class="form-control code-input" rows="15" 
+                                  placeholder="Paste your SQL query or Spotfire expression here...
+
+Example SQL:
+SELECT 
+    CustomerID,
+    SUM(OrderAmount) as TotalAmount,
+    COUNT(*) as OrderCount
+FROM Orders 
+WHERE OrderDate >= '2023-01-01'
+GROUP BY CustomerID
+
+Example Spotfire:
+Sum([Sales]) OVER ([Region])
+If([Category] = 'Electronics', [Sales] * 1.1, [Sales])"></textarea>
+                        
+                        <div class="mt-3 d-flex gap-2">
+                            <button id="validateBtn" class="btn btn-outline-secondary">
+                                <i data-feather="check-circle" class="me-1"></i>
+                                Validate
+                            </button>
+                            <button id="convertBtn" class="btn btn-primary">
+                                <i data-feather="arrow-right" class="me-1"></i>
+                                Convert to DAX
+                            </button>
+                            <button id="clearBtn" class="btn btn-outline-danger">
+                                <i data-feather="trash-2" class="me-1"></i>
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Output Section -->
+            <div class="col-lg-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i data-feather="code" class="me-2"></i>
+                            DAX Output
+                        </h5>
+                        <button id="copyBtn" class="btn btn-outline-success btn-sm" style="display: none;">
+                            <i data-feather="copy" class="me-1"></i>
+                            Copy
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="outputContainer">
+                            <div id="emptyState" class="text-center py-5">
+                                <i data-feather="arrow-left" class="mb-3" style="width: 48px; height: 48px; opacity: 0.5;"></i>
+                                <p class="text-muted">Your converted DAX code will appear here</p>
+                            </div>
+                            
+                            <pre id="daxOutput" class="code-output" style="display: none;"><code class="language-dax"></code></pre>
+                        </div>
+                        
+                        <!-- Loading State -->
+                        <div id="loadingState" class="text-center py-4" style="display: none;">
+                            <div class="spinner-border text-primary me-2" role="status">
+                                <span class="visually-hidden">Converting...</span>
+                            </div>
+                            <span>Converting your code...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Object Identification & Errors -->
+        <div class="row">
+            <!-- Object Identification -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i data-feather="layers" class="me-2"></i>
+                            Objects Identified
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="objectsContainer">
+                            <div class="row" id="objectsDisplay">
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-primary">
+                                        <i data-feather="table" class="me-1"></i>
+                                        Tables
+                                    </h6>
+                                    <ul id="tablesList" class="list-unstyled ms-3">
+                                        <li class="text-muted">No tables identified</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-info">
+                                        <i data-feather="columns" class="me-1"></i>
+                                        Columns
+                                    </h6>
+                                    <ul id="columnsList" class="list-unstyled ms-3">
+                                        <li class="text-muted">No columns identified</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-warning">
+                                        <i data-feather="function" class="me-1"></i>
+                                        Functions
+                                    </h6>
+                                    <ul id="functionsList" class="list-unstyled ms-3">
+                                        <li class="text-muted">No functions identified</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="text-success">
+                                        <i data-feather="tag" class="me-1"></i>
+                                        Aliases
+                                    </h6>
+                                    <ul id="aliasesList" class="list-unstyled ms-3">
+                                        <li class="text-muted">No aliases identified</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Errors and Warnings -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i data-feather="alert-triangle" class="me-2"></i>
+                            Validation & Guidance
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="messagesContainer">
+                            <!-- Success Messages -->
+                            <div id="successMessages" style="display: none;"></div>
+                            
+                            <!-- Warning Messages -->
+                            <div id="warningMessages" style="display: none;"></div>
+                            
+                            <!-- Error Messages -->
+                            <div id="errorMessages" style="display: none;"></div>
+                            
+                            <!-- Conversion Notes -->
+                            <div id="notesMessages" style="display: none;"></div>
+                            
+                            <!-- Default State -->
+                            <div id="noMessages" class="text-center py-3">
+                                <i data-feather="check-circle" class="mb-2" style="width: 32px; height: 32px; opacity: 0.5;"></i>
+                                <p class="text-muted mb-0">Validation results and conversion guidance will appear here</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Section -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i data-feather="help-circle" class="me-2"></i>
+                            Conversion Guide
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-primary">SQL to DAX</h6>
+                                <ul class="small">
+                                    <li>SELECT with aggregation → DAX Measures</li>
+                                    <li>SELECT without aggregation → Calculated Columns</li>
+                                    <li>WHERE clauses → FILTER functions</li>
+                                    <li>JOIN operations → RELATED/RELATEDTABLE</li>
+                                    <li>GROUP BY → Implicit grouping in measures</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-info">Spotfire to DAX</h6>
+                                <ul class="small">
+                                    <li>Aggregation functions → DAX aggregations</li>
+                                    <li>OVER clauses → Context modification</li>
+                                    <li>IF expressions → DAX IF function</li>
+                                    <li>CASE expressions → SWITCH function</li>
+                                    <li>Column references [Col] → Table[Col]</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <h6 class="text-warning">Important Notes</h6>
+                                <ul class="small">
+                                    <li>NULL handling differs between languages</li>
+                                    <li>DAX is case-sensitive for table/column names</li>
+                                    <li>Context matters in DAX calculations</li>
+                                    <li>Some SQL operations have no DAX equivalent</li>
+                                    <li>Always test converted code in your environment</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Prism.js for syntax highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+    </script>
+</body>
+</html>
