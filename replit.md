@@ -115,9 +115,15 @@ This is a web-based code conversion tool that transforms SQL queries and Spotfir
 - June 18, 2025: Created comprehensive documentation (README.md in English and Portuguese)
 - June 18, 2025: Fixed Feather icon compatibility issue
 - June 18, 2025: Added dependencies documentation
+- June 18, 2025: Fixed critical table name identification bug - now correctly identifies table names in FROM clause
+- June 18, 2025: Corrected column name generation in DAX output - resolves issue where column names were missing
+- June 18, 2025: Improved parsing logic for table.column references and alias handling
+- June 18, 2025: Enhanced SQL parser to better handle complex queries with JOINs and schema prefixes
 
 ## User Preferences
 
 - Preferred communication style: Simple, everyday language
 - Prefers documentation in both English and Portuguese
 - Values comprehensive project documentation
+- Expects accurate table and column name identification in SQL conversion
+- Prioritizes functional correctness over advanced features

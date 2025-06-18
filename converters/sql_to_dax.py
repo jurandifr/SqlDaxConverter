@@ -172,8 +172,11 @@ class SQLToDaxConverter(BaseConverter):
         calculations = []
         
         for column in select_columns:
-            if column.get('expression'):
-                # Handle calculated expressions
+            # Check if it's a complex expression or simple column reference
+            if (column.get('expression') and 
+                column['expression'] != column.get('column', '') and
+                not column.get('is_aggregation')):
+                # Handle calculated expressions (when expression differs from column name)
                 expression = column['expression']
                 expression = self._convert_sql_expression_to_dax(expression, table_name)
                 column_name = column.get('alias', 'CalculatedColumn')
