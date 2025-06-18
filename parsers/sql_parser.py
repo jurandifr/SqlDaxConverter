@@ -366,22 +366,43 @@ class SQLParser:
         }
         
         try:
-            # Find tables
+            # Find tables - improved patterns
             table_patterns = [
-                r'FROM\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)',
-                r'JOIN\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)',
-                r'UPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)',
-                r'INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)'
+                r'FROM\s+([a-zA-Z_][a-zA-Z0-9_]*)',  # Simple table name after FROM
+                r'JOIN\s+([a-zA-Z_][a-zA-Z0-9_]*)',  # Simple table name after JOIN
+                r'UPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*)', # Simple table name after UPDATE
+                r'INSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*)'  # Simple table name after INSERT INTO
             ]
             
             for pattern in table_patterns:
                 matches = re.findall(pattern, sql_code, re.IGNORECASE)
-                objects['tables'].extend(matches)
+                for match in matches:
+                    # Remove schema prefix if exists
+                    if '.' in match:
+                        table_name = match.split('.')[-1]
+                    else:
+                        table_name = match
+                    objects['tables'].append(table_name)
+            
+            # Find columns from SELECT clause
+            select_match = re.search(r'SELECT\s+(.*?)\s+FROM', sql_code, re.IGNORECASE | re.DOTALL)
+            if select_match:
+                select_clause = select_match.group(1)
+                # Split by commas and extract column names
+                column_parts = re.split(r',(?![^()]*\))', select_clause)
+                for part in column_parts:
+                    part = part.strip()
+                    # Remove alias
+                    column_match = re.match(r'^([a-zA-Z_][a-zA-Z0-9_]*)', part)
+                    if column_match and not re.match(r'^\d+$', column_match.group(1)):
+                        column_name = column_match.group(1)
+                        if column_name.upper() not in ['SELECT', 'FROM', 'WHERE', 'GROUP', 'ORDER', 'HAVING']:
+                            objects['columns'].append(column_name)
             
             # Find functions
             function_pattern = r'\b([A-Z_][A-Z0-9_]*)\s*\('
             functions = re.findall(function_pattern, sql_code)
-            objects['functions'] = list(set(functions))
+            objects['functions'] = [f for f in functions if f.upper() in ['SUM', 'COUNT', 'AVG', 'MIN', 'MAX', 'STDEV', 'VAR']]
             
             # Find aliases
             alias_pattern = r'\bAS\s+([a-zA-Z_][a-zA-Z0-9_]*)'
@@ -390,6 +411,8 @@ class SQLParser:
             
             # Remove duplicates
             objects['tables'] = list(set(objects['tables']))
+            objects['columns'] = list(set(objects['columns']))
+            objects['functions'] = list(set(objects['functions']))
             
             return objects
             

@@ -176,7 +176,8 @@ class SQLToDaxConverter(BaseConverter):
             else:
                 # Simple column reference - convert to proper DAX reference
                 column_name = column['column']
-                calculations.append(f"{column_name} = {table_name}[{column_name}]")
+                alias_name = column.get('alias', column_name)
+                calculations.append(f"{alias_name} = {table_name}[{column_name}]")
         
         return '\n'.join(calculations)
     
