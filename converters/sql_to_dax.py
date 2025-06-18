@@ -145,7 +145,7 @@ class SQLToDaxConverter(BaseConverter):
                 
                 # Build measure
                 measure_name = column.get('alias')
-                if not measure_name:
+                if not measure_name or not measure_name.strip():
                     measure_name = f"SUM_{column_name}" if function == "SUM" else f"{function}_{column_name}"
                 
                 if where_clause:
@@ -185,7 +185,7 @@ class SQLToDaxConverter(BaseConverter):
                 if '.' in column_name:
                     column_name = column_name.split('.')[-1]
                 alias_name = column.get('alias')
-                if alias_name:
+                if alias_name and alias_name.strip():
                     calculations.append(f"{alias_name} = {table_name}[{column_name}]")
                 else:
                     calculations.append(f"{column_name} = {table_name}[{column_name}]")
