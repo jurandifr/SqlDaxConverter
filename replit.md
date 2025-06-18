@@ -111,8 +111,13 @@ This is a web-based code conversion tool that transforms SQL queries and Spotfir
 
 ## Changelog
 
-- June 18, 2025. Initial setup
+- June 18, 2025: Initial setup - Complete SQL/Spotfire to DAX converter application
+- June 18, 2025: Created comprehensive documentation (README.md in English and Portuguese)
+- June 18, 2025: Fixed Feather icon compatibility issue
+- June 18, 2025: Added dependencies documentation
 
 ## User Preferences
 
-Preferred communication style: Simple, everyday language.
+- Preferred communication style: Simple, everyday language
+- Prefers documentation in both English and Portuguese
+- Values comprehensive project documentation
